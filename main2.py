@@ -2,7 +2,7 @@ import google.generativeai as genai
 import requests
 from bs4 import BeautifulSoup
 from googlesearch import search
-
+ 
 # Configure the API key
 genai.configure(api_key="AIzaSyAW1gHGYSLAHkg1tkPNG5tfvnQ_MJw64wM")
 
