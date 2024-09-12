@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from googlesearch import search
 
 # Configure the API key
-genai.configure(api_key="api")
+genai.configure(api_key="AIzaSyAW1gHGYSLAHkg1tkPNG5tfvnQ_MJw64wM")
 
 # Initialize the generative model
 model = genai.GenerativeModel('gemini-1.5-flash')
@@ -22,9 +22,13 @@ def display_history():
     """
     Displays the conversation history.
     """
-    print("\nConversation History:")
+    print("\n================= Conversation History =================")
     for i, entry in enumerate(conversation_history, 1):
-        print(f"{i}. Q: {entry['question']}\n   A: {entry['answer']}\n   Link: {entry['link']}\n")
+        print(f"{i}.")
+        print(f"  Q: {entry['question']}")
+        print(f"  A: {entry['answer']}")
+        print(f"  Link: {entry['link']}\n")
+    print("========================================================\n")
 
 def summarize_content(content):
     """
@@ -150,7 +154,7 @@ def analyze_answer_relevance(answer, question):
             return False
     except Exception as e:
         print(f"Error in LLM response during relevance check: {e}")
-        return
+        return False
 
 
 def search_for_answer(url, question, user_choice, max_attempts=2):
@@ -165,7 +169,6 @@ def search_for_answer(url, question, user_choice, max_attempts=2):
     
     # Check if the LLM finds the answer relevant to the question
     if answer and analyze_answer_relevance(answer, question):
-        print(f"Relevant answer found in the provided URL: {answer}\n")
         return answer, url
     else:
         print("No relevant answer found in the provided URL, searching additional links.")
@@ -191,38 +194,50 @@ def search_for_answer(url, question, user_choice, max_attempts=2):
     print("No relevant answer found after checking additional links.")
     return None, None
 
+def get_user_input(prompt, valid_choices=None):
+    """
+    Prompts the user for input and validates the response if valid_choices are provided.
+    """
+    while True:
+        user_input = input(prompt).lower()
+        if valid_choices:
+            if user_input in valid_choices:
+                return user_input
+            else:
+                print(f"Invalid choice. Please choose from: {', '.join(valid_choices)}.")
+        else:
+            return user_input
+
 def main():
     """
     Main function to take user input from the console and find answers
     from the provided URL and the question.
     """
     while True:
-        user_url = input("Please provide the URL: ")
-        question = input("Please provide the question: ")
+        user_url = get_user_input("Please provide the URL: ")
+        question = get_user_input("Please provide the question: ")
         
         # Ask the user for their preferred type of answer: summary or detailed
-        user_choice = input("Would you like a summary or a detailed answer? (summary/detailed): ").lower()
-        if user_choice not in ["summary", "detailed"]:
-            print("Invalid choice. Defaulting to detailed.")
-            user_choice = "detailed"
+        user_choice = get_user_input("Would you like a summary or a detailed answer? (summary/detailed): ", ["summary", "detailed"])
         
         # Try to find the answer by searching through the user's URL and related links
         answer, link = search_for_answer(user_url, question, user_choice)
     
         if answer:
-            print(f"Answer: {answer},\n\nRelated Information Found in the link: {link}")
+            print(f"\nAnswer: {answer}\nRelated Information Found in the link: {link}\n")
             add_to_history(question, answer, link)
         else:
             print("Sorry, the information couldn't be found.")
         
         # Ask if the user wants to see the conversation history
-        show_history = input("\nWould you like to see the conversation history? (yes/no): ")
-        if show_history.lower() == 'yes':
+        show_history = get_user_input("\nWould you like to see the conversation history? (yes/no): ", ["yes", "no"])
+        if show_history == 'yes':
             display_history()
         
         # Ask if the user wants to continue
-        continue_search = input("\nWould you like to search for another question? (yes/no): ")
-        if continue_search.lower() != 'yes':
+        continue_search = get_user_input("\nWould you like to search for another question? (yes/no): ", ["yes", "no"])
+        if continue_search != 'yes':
+            print("\nGoodbye!")
             break
 
 if __name__ == "__main__":
