@@ -68,9 +68,9 @@ def search_multiple_urls(urls, question, max_attempts=3):
     return None
 
 # Example usage
-user_url = "https://www.haberler.com/spor/cumhurbaskani-erdogan-ile-giovanni-van-17811859-haberi/"  # User-provided URL
-question = "Cumhurbaşkani Erdoğan kimle anlaşamadi"  # User-provided question
-additional_urls = ["https://www.haberler.com/guncel/narin-cinayeti-sorusturmasinda-gozaltina-alinan-17811739-haberi/", "https://www.haberler.com/3-sayfa/adliyeye-sevk-edildiler-peki-narin-guran-17811981-haberi/"]
+user_url = "ex_url"  # User-provided URL
+question = "question"  # User-provided question
+additional_urls = ["ex_url_1", "ex_url_2"]
 
 # Try to find the answer
 answer = search_multiple_urls([user_url] + additional_urls, question)
