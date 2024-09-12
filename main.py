@@ -7,7 +7,7 @@ from rich.table import Table
 from rich.prompt import Prompt
 from rich.panel import Panel
 from rich.text import Text
-
+ 
 # Configure the API key
 genai.configure(api_key="AIzaSyAW1gHGYSLAHkg1tkPNG5tfvnQ_MJw64wM")
 
