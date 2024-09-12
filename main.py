@@ -116,14 +116,14 @@ def search_for_answer(url, question, max_attempts=2):
     This function searches for the answer by first looking at the provided URL.
     If no relevant answer is found, it searches additional links obtained via a web search.
     """
-    print(f"Searching the provided URL: {url}")
+    print(f"\nSearching the provided URL: {url}\n")
     
     # Try the user's provided URL first
     answer = find_answer_in_url(url, question)
     
     # Check if the LLM finds the answer relevant to the question
     if answer and analyze_answer_relevance(answer, question):
-        print(f"Relevant answer found in the provided URL: {answer}")
+        print(f"Relevant answer found in the provided URL: {answer}\n")
         return answer,url
     else:
         print("No relevant answer found in the provided URL, searching additional links.")
@@ -133,12 +133,12 @@ def search_for_answer(url, question, max_attempts=2):
     
     attempts = 0
     for link in additional_links:
-        print(f"Searching in URL: {link}")
+        print(f"Searching in URL: {link}\n")
         answer = find_answer_in_url(link, question)
         
         # Check if the LLM finds the answer relevant
         if answer and analyze_answer_relevance(answer, question):
-            print(f"Relevant answer found in additional link: {answer}")
+            print(f"Relevant answer found in additional link: {answer}\n")
             return answer,link
         
         attempts += 1
@@ -161,7 +161,7 @@ def main():
     answer,link = search_for_answer(user_url, question)
 
     if answer:
-        print(f"Answer: {answer}, Related Information Found in the link: {link}")
+        print(f"Answer: {answer},\n\n Related Information Found in the link: {link}")
     else:
         print("Sorry, the information couldn't be found.")
 
