@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from googlesearch import search
  
 # Configure the API key
-genai.configure(api_key="AIzaSyAW1gHGYSLAHkg1tkPNG5tfvnQ_MJw64wM")
+genai.configure(api_key="api")
 
 # Initialize the generative model
 model = genai.GenerativeModel('gemini-1.5-flash')
