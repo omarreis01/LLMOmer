@@ -3,7 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 
 # Configure the API key
-genai.configure(api_key="api")
+genai.configure(api_key="AIzaSyAW1gHGYSLAHkg1tkPNG5tfvnQ_MJw64wM")
 
 # Initialize the generative model
 model = genai.GenerativeModel('gemini-1.5-flash')
@@ -67,15 +67,28 @@ def search_multiple_urls(urls, question, max_attempts=3):
     print("No answer found after checking 3 URLs.")
     return None
 
-# Example usage
-user_url = "ex_url"  # User-provided URL
-question = "question"  # User-provided question
-additional_urls = ["ex_url_1", "ex_url_2"]
+def main():
+    """
+    Main function to take user input from the console and find answers
+    from URLs and the question provided.
+    """
+    user_url = input("Please provide the main URL: ")
+    question = input("Please provide the question: ")
+    
+    additional_urls = []
+    while True:
+        additional_url = input("Enter additional URL (or press Enter to stop): ")
+        if not additional_url:
+            break
+        additional_urls.append(additional_url)
+    
+    # Try to find the answer by searching through the URLs
+    answer = search_multiple_urls([user_url] + additional_urls, question)
 
-# Try to find the answer
-answer = search_multiple_urls([user_url] + additional_urls, question)
+    if answer:
+        print(f"Final answer: {answer}")
+    else:
+        print("Sorry, the information couldn't be found.")
 
-if answer:
-    print(f"Final answer: {answer}")
-else:
-    print("Sorry, the information couldn't be found.")
+if __name__ == "__main__":
+    main()
