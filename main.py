@@ -124,10 +124,16 @@ def search_additional_links(question, num_results=5):
 def analyze_answer_relevance(answer, question):
     """
     This function sends the answer and the question to the LLM to check if the answer is relevant.
-    The LLM will try to analyze the relevance based on the content provided.
+    The LLM will analyze whether the answer directly addresses the question's topic.
     """
     try:
-        prompt = f"Here is the question: {question}\n\nHere is the answer: {answer}\n\nIs this answer relevant to the question? Answer with 'yes' or 'no'."
+        prompt = (
+            f"Question: {question}\n\n"
+            f"Answer: {answer}\n\n"
+            "Does the answer directly address the question? "
+            "If the answer is about something else or doesn't contain relevant information, respond with 'no'. "
+            "Only respond 'yes' if the answer specifically answers the question's topic."
+        )
         response = model.generate_content(prompt)
         
         if response.candidates and len(response.candidates) > 0:
@@ -144,9 +150,10 @@ def analyze_answer_relevance(answer, question):
             return False
     except Exception as e:
         print(f"Error in LLM response during relevance check: {e}")
-        return False
+        return
 
-def search_for_answer(url, question, user_choice, max_attempts=0):
+
+def search_for_answer(url, question, user_choice, max_attempts=2):
     """
     This function searches for the answer by first looking at the provided URL.
     If no relevant answer is found, it searches additional links obtained via a web search.
@@ -208,8 +215,10 @@ def main():
         else:
             print("Sorry, the information couldn't be found.")
         
-        # Display conversation history
-        display_history()
+        # Ask if the user wants to see the conversation history
+        show_history = input("\nWould you like to see the conversation history? (yes/no): ")
+        if show_history.lower() == 'yes':
+            display_history()
         
         # Ask if the user wants to continue
         continue_search = input("\nWould you like to search for another question? (yes/no): ")
