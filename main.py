@@ -9,7 +9,7 @@ from rich.panel import Panel
 from rich.text import Text
  
 # Configure the API key
-genai.configure(api_key="AIzaSyAW1gHGYSLAHkg1tkPNG5tfvnQ_MJw64wM")
+genai.configure(api_key="api")
 
 # Initialize the generative model and rich console
 model = genai.GenerativeModel('gemini-1.5-flash')
