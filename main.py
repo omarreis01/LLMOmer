@@ -2,12 +2,18 @@ import google.generativeai as genai
 import requests
 from bs4 import BeautifulSoup
 from googlesearch import search
+from rich.console import Console
+from rich.table import Table
+from rich.prompt import Prompt
+from rich.panel import Panel
+from rich.text import Text
 
 # Configure the API key
 genai.configure(api_key="AIzaSyAW1gHGYSLAHkg1tkPNG5tfvnQ_MJw64wM")
 
-# Initialize the generative model
+# Initialize the generative model and rich console
 model = genai.GenerativeModel('gemini-1.5-flash')
+console = Console()
 
 # Initialize conversation history
 conversation_history = []
@@ -20,15 +26,18 @@ def add_to_history(question, answer, link):
 
 def display_history():
     """
-    Displays the conversation history.
+    Displays the conversation history in a table format using rich.
     """
-    print("\n================= Conversation History =================")
+    table = Table(title="Conversation History")
+    table.add_column("No.", justify="right", style="cyan", no_wrap=True)
+    table.add_column("Question", style="magenta")
+    table.add_column("Answer", style="green")
+    table.add_column("Link", style="blue")
+
     for i, entry in enumerate(conversation_history, 1):
-        print(f"{i}.")
-        print(f"  Q: {entry['question']}")
-        print(f"  A: {entry['answer']}")
-        print(f"  Link: {entry['link']}\n")
-    print("========================================================\n")
+        table.add_row(str(i), entry['question'], entry['answer'], entry['link'])
+    
+    console.print(table)
 
 def summarize_content(content):
     """
@@ -44,7 +53,7 @@ def summarize_content(content):
         else:
             return "No summary generated."
     except Exception as e:
-        print(f"Error in LLM response during summarization: {e}")
+        console.print(f"[bold red]Error in LLM response during summarization:[/bold red] {e}")
         return "Error generating summary."
 
 def extract_content_from_url(url):
@@ -59,7 +68,7 @@ def extract_content_from_url(url):
         content = soup.get_text(separator=' ', strip=True)
         return content
     except requests.RequestException as e:
-        print(f"Error fetching URL {url}: {e}")
+        console.print(f"[bold red]Error fetching URL {url}:[/bold red] {e}")
         return None
 
 def ask_llm_about_content(content, question, user_choice):
@@ -94,7 +103,7 @@ def ask_llm_about_content(content, question, user_choice):
             return "No candidates returned in the response."
     
     except Exception as e:
-        print(f"Error in LLM response: {e}")
+        console.print(f"[bold red]Error in LLM response:[/bold red] {e}")
         return None
 
 def find_answer_in_url(url, question, user_choice):
@@ -115,14 +124,14 @@ def search_additional_links(question, num_results=5):
     This function searches Google for additional links based on the question.
     It returns a list of URLs from the search results.
     """
-    print(f"Searching the web for more information about: {question}")
+    console.print(f"🔍 Searching the web for more information about: [bold yellow]{question}[/bold yellow]")
     try:
         search_results = []
         for url in search(question, num_results=num_results):
             search_results.append(url)
         return search_results
     except Exception as e:
-        print(f"Error during web search: {e}")
+        console.print(f"[bold red]Error during web search:[/bold red] {e}")
         return []
 
 def analyze_answer_relevance(answer, question):
@@ -153,7 +162,7 @@ def analyze_answer_relevance(answer, question):
         else:
             return False
     except Exception as e:
-        print(f"Error in LLM response during relevance check: {e}")
+        console.print(f"[bold red]Error in LLM response during relevance check:[/bold red] {e}")
         return False
 
 
@@ -162,51 +171,38 @@ def search_for_answer(url, question, user_choice, max_attempts=2):
     This function searches for the answer by first looking at the provided URL.
     If no relevant answer is found, it searches additional links obtained via a web search.
     """
-    print(f"\nSearching the provided URL: {url}\n")
+    console.print(Panel(f"Searching the provided URL: {url}", style="bold cyan"))
     
     # Try the user's provided URL first
     answer = find_answer_in_url(url, question, user_choice)
     
     # Check if the LLM finds the answer relevant to the question
     if answer and analyze_answer_relevance(answer, question):
+        console.print(Panel(f"✅ Relevant answer found in the provided URL:\n{answer}", style="bold green"))
         return answer, url
     else:
-        print("No relevant answer found in the provided URL, searching additional links.")
+        console.print(Panel("❌ No relevant answer found in the provided URL. Searching additional links...", style="bold red"))
     
     # If no relevant answer is found, search for additional links
     additional_links = search_additional_links(question)
     
     attempts = 0
     for link in additional_links:
-        print(f"Searching in URL: {link}\n")
+        console.print(f"🔍 Searching in URL: [bold blue]{link}[/bold blue]")
         answer = find_answer_in_url(link, question, user_choice)
         
         # Check if the LLM finds the answer relevant
         if answer and analyze_answer_relevance(answer, question):
-            print(f"Relevant answer found in additional link: {answer}\n")
+            console.print(Panel(f"✅ Relevant answer found in additional link:\n{answer}", style="bold green"))
             return answer, link
         
         attempts += 1
         if attempts >= max_attempts:
-            print(f"Max attempts reached: {attempts}")
+            console.print(f"[bold red]Max attempts reached: {attempts}[/bold red]")
             break
     
-    print("No relevant answer found after checking additional links.")
+    console.print("[bold red]No relevant answer found after checking additional links.[/bold red]")
     return None, None
-
-def get_user_input(prompt, valid_choices=None):
-    """
-    Prompts the user for input and validates the response if valid_choices are provided.
-    """
-    while True:
-        user_input = input(prompt).lower()
-        if valid_choices:
-            if user_input in valid_choices:
-                return user_input
-            else:
-                print(f"Invalid choice. Please choose from: {', '.join(valid_choices)}.")
-        else:
-            return user_input
 
 def main():
     """
@@ -214,30 +210,30 @@ def main():
     from the provided URL and the question.
     """
     while True:
-        user_url = get_user_input("Please provide the URL: ")
-        question = get_user_input("Please provide the question: ")
+        user_url = Prompt.ask("Please provide the URL")
+        question = Prompt.ask("Please provide the question")
         
         # Ask the user for their preferred type of answer: summary or detailed
-        user_choice = get_user_input("Would you like a summary or a detailed answer? (summary/detailed): ", ["summary", "detailed"])
+        user_choice = Prompt.ask("Would you like a summary or a detailed answer?", choices=["summary", "detailed"], default="detailed")
         
         # Try to find the answer by searching through the user's URL and related links
         answer, link = search_for_answer(user_url, question, user_choice)
     
         if answer:
-            print(f"\nAnswer: {answer}\nRelated Information Found in the link: {link}\n")
+            console.print(Panel(f"\nAnswer: {answer}\n\nRelated Information Found in the link: {link}", style="bold green"))
             add_to_history(question, answer, link)
         else:
-            print("Sorry, the information couldn't be found.")
+            console.print("[bold red]Sorry, the information couldn't be found.[/bold red]")
         
         # Ask if the user wants to see the conversation history
-        show_history = get_user_input("\nWould you like to see the conversation history? (yes/no): ", ["yes", "no"])
+        show_history = Prompt.ask("\nWould you like to see the conversation history?", choices=["yes", "no"], default="yes")
         if show_history == 'yes':
             display_history()
         
         # Ask if the user wants to continue
-        continue_search = get_user_input("\nWould you like to search for another question? (yes/no): ", ["yes", "no"])
+        continue_search = Prompt.ask("\nWould you like to search for another question?", choices=["yes", "no"], default="yes")
         if continue_search != 'yes':
-            print("\nGoodbye!")
+            console.print("[bold blue]\nGoodbye![/bold blue]")
             break
 
 if __name__ == "__main__":
