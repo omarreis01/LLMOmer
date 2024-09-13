@@ -12,7 +12,7 @@ from typing import List
 import json  # Structured output using JSON
 
 # Configure the API key
-genai.configure(api_key="AIzaSyAW1gHGYSLAHkg1tkPNG5tfvnQ_MJw64wM")
+genai.configure(api_key="api")
 
 # Initialize the generative model and rich console
 model = genai.GenerativeModel('gemini-1.5-flash')
