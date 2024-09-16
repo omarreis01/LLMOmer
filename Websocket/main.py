@@ -9,7 +9,7 @@ from rich.panel import Panel
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from typing import List
 import json  # Structured output using JSON
-import os 
+#import os 
 #from dotenv import load_dotenv
 
 
