@@ -7,9 +7,9 @@ from rich.table import Table
 from rich.prompt import Prompt
 from rich.panel import Panel
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from typing import List
+from typing import List, Optional, Tuple  # Add appropriate typing imports
 import json  # Structured output using JSON
-#import os 
+import os 
 #from dotenv import load_dotenv
 
 
@@ -30,31 +30,27 @@ app = FastAPI()
 # Initialize conversation history
 conversation_history = []
 
-
-def ask_llm_about_content(content, question, user_choice):
+def ask_llm_about_content(content: str, question: str, user_choice: str) -> Optional[str]:
     """
     This function sends the content and the question to the LLM.
     The LLM will try to answer based on the content provided, and handle safety concerns.
     """
     try:
-        prompt = f"Here is the content: {content}\n\nAnswer this question: {question}, don't use your information, stick to the content"
+        prompt: str = f"Here is the content: {content}\n\nAnswer this question: {question}, don't use your information, stick to the content"
         response = model.generate_content(prompt)
         
-        # Check if the response contains candidates
         if response.candidates and len(response.candidates) > 0:
             candidate = response.candidates[0]
             
-            # Check if the content was not generated due to safety concerns
             if candidate.finish_reason == "SAFETY":
                 return "Content generation blocked due to safety concerns."
             
             if hasattr(candidate, 'content'):
                 if hasattr(candidate.content, 'parts'):
-                    # Summarize or provide a detailed response based on user choice
                     if user_choice == "summary":
-                        content = candidate.content.parts[0].text.strip()
+                        content: str = candidate.content.parts[0].text.strip()
                         try:
-                            prompt = f"Summarize the following content: {content}"
+                            prompt: str = f"Summarize the following content: {content}"
                             response = model.generate_content(prompt)
                             
                             if response.candidates and len(response.candidates) > 0:
@@ -78,16 +74,15 @@ def ask_llm_about_content(content, question, user_choice):
         console.print(f"[bold red]Error in LLM response:[/bold red] {e}")
         return None
 
-def find_answer_in_url(url, question, user_choice):
+def find_answer_in_url(url: str, question: str, user_choice: str) -> Optional[str]:
     """
     This function extracts content from the URL and asks the LLM
     if it can find the answer to the provided question.
     """
-    
-    content = ""
+    content: str = ""
     try:
         response = requests.get(url)
-        response.raise_for_status()  # Check for HTTP errors
+        response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         content = soup.get_text(separator=' ', strip=True)
     except requests.RequestException as e:
@@ -95,18 +90,15 @@ def find_answer_in_url(url, question, user_choice):
         content = None
     if not content:
         return None
-    answer = ask_llm_about_content(content, question, user_choice)
-    if answer:
-        return answer
-    return None
+    return ask_llm_about_content(content, question, user_choice)
 
-def analyze_answer_relevance(answer, question):
+def analyze_answer_relevance(answer: str, question: str) -> bool:
     """
     This function sends the answer and the question to the LLM to check if the answer is relevant.
     The LLM will analyze whether the answer directly addresses the question's topic.
     """
     try:
-        prompt = (
+        prompt: str = (
             f"Question: {question}\n\n"
             f"Answer: {answer}\n\n"
             "Does the answer directly address the question? "
@@ -117,57 +109,45 @@ def analyze_answer_relevance(answer, question):
         
         if response.candidates and len(response.candidates) > 0:
             candidate = response.candidates[0]
-            relevance_check = candidate.content.parts[0].text.strip().lower()
+            relevance_check: str = candidate.content.parts[0].text.strip().lower()
             
-            if 'yes' in relevance_check:
-                return True
-            elif 'no' in relevance_check:
-                return False
-            else:
-                return False  # If the LLM response is ambiguous, assume irrelevant
-        else:
-            return False
+            return 'yes' in relevance_check
+        return False
     except Exception as e:
         console.print(f"[bold red]Error in LLM response during relevance check:[/bold red] {e}")
         return False
 
 
-def search_for_answer(url, question, user_choice, max_attempts=2):
+def search_for_answer(url: str, question: str, user_choice: str, max_attempts: int = 2) -> Tuple[Optional[str], Optional[str]]:
     """
     This function searches for the answer by first looking at the provided URL.
     If no relevant answer is found, it searches additional links obtained via a web search.
     """
     console.print(Panel(f"Searching the provided URL: {url}", style="bold cyan"))
     
-    # Try the user's provided URL first
-    answer = find_answer_in_url(url, question, user_choice)
+    answer: Optional[str] = find_answer_in_url(url, question, user_choice)
     
-    # Check if the LLM finds the answer relevant to the question
     if answer and analyze_answer_relevance(answer, question):
         console.print(Panel(f"✅ Relevant answer found in the provided URL:\n{answer}", style="bold green"))
         return answer, url
     else:
         console.print(Panel("❌ No relevant answer found in the provided URL. Searching additional links...", style="bold red"))
     
-    # If no relevant answer is found, search for additional links
-    additional_links = []
-    num_results = 5
+    additional_links: List[str] = []
+    num_results: int = 5
     console.print(f"🔍 Searching the web for more information about: [bold yellow]{question}[/bold yellow]")
     try:
-        search_results = []
-        for url in search(question, num_results=num_results):
-            search_results.append(url)
+        search_results: List[str] = [url for url in search(question, num_results=num_results)]
         additional_links = search_results
     except Exception as e:
         console.print(f"[bold red]Error during web search:[/bold red] {e}")
         additional_links = []
 
-    attempts = 0
+    attempts: int = 0
     for link in additional_links:
         console.print(f"🔍 Searching in URL: [bold blue]{link}[/bold blue]")
         answer = find_answer_in_url(link, question, user_choice)
         
-        # Check if the LLM finds the answer relevant
         if answer and analyze_answer_relevance(answer, question):
             console.print(Panel(f"✅ Relevant answer found in additional link:\n{answer}", style="bold green"))
             return answer, link
