@@ -5,3 +5,4 @@ beautifulsoup4==4.12.3
 googlesearch-python==1.2.5
 rich==13.8.1
 fastapi==0.114.1
+uvicorn==0.30.6
