@@ -33,7 +33,7 @@
     <br><br>
     
     <!-- Button to send the question -->
-    <button onclick="sendRequest()">Send</button>
+    <button id="sendBtn" onclick="sendRequest()">Send</button>
 
     <!-- Table to display responses from the WebSocket server -->
     <table id="messagesTable">
@@ -62,8 +62,20 @@
             const data = JSON.parse(event.data);  // Assuming the server sends a JSON object
             const tableBody = document.querySelector('#messagesTable tbody');
 
-            if (data.message) {
-                alert(data.message);  // Display the message to the user asking for more input
+            // Check if the server is requesting more information
+            if (data.message && data.message.includes("The LLM needs more information")) {
+                // Show a prompt for the user to input new URL and question
+                const newUrl = prompt("The LLM needs more information. Please provide a new URL:");
+                const newQuestion = prompt("Please provide a new question:");
+
+                // Send the new input back to the server
+                if (newUrl && newQuestion) {
+                    const newMessage = JSON.stringify({
+                        url: newUrl,
+                        question: newQuestion
+                    });
+                    ws.send(newMessage);
+                }
             } else {
                 const row = document.createElement('tr');
                 
