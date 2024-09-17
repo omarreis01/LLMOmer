@@ -10,7 +10,7 @@ import json
 
 
 # Configure the API key
-genai.configure(api_key="api")
+genai.configure(api_key="AIzaSyAW1gHGYSLAHkg1tkPNG5tfvnQ_MJw64wM")
 
 # Initialize the generative model and rich console
 model = genai.GenerativeModel('gemini-1.5-flash')
@@ -40,10 +40,9 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-def find_answer_in_url(url: str, question: str, user_choice: str) -> Optional[str]:
+def find_content_from_url(url: str) -> Optional[str]:
     """
-    This function extracts content from the URL and asks the LLM
-    if it can find the answer to the provided question.
+    This function extracts content from the URL.
     """
     content: str = ""
     try:
@@ -51,60 +50,62 @@ def find_answer_in_url(url: str, question: str, user_choice: str) -> Optional[st
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         content = soup.get_text(separator=' ', strip=True)
+        return content
     except requests.RequestException as e:
         console.print(f"[bold red]Error fetching URL {url}:[/bold red] {e}")
         return None
+def call_llm_with_json(content: str, question: str) -> Dict:
+    """
+    Calls the LLM once and returns a JSON result with answer, relevance, and decision info.
+    """
+    prompt: str = (
+        f"Here is the content: {content}\n\n"
+        f"Question: {question}\n\n"
+        f"Firstly Create the answer part in JSON with question from the content, DONT USE YOUR BACK-UP INFORMATION, strictly stick to the content if relevant information cannot be found you can say I dont find the information from the content"
+        f"For the is_relevant part in JSON If the answer doesn't contain relevant information, do the is_relevant part 'no'.Only do the is_relevant part 'yes' if the answer specifically answers the question's topic."
+        f"For the decision part in JSON :Evaluate how closely the question is related to the content in the answer:\n If the question is loosely related to the content (e.g., both belong to similar categories or fields, like programming languages or technologies), respond with 'search_links'.\n If the question is completely unrelated to the content (e.g., a question about a political figure and content about programming), respond with 'more_info'."
+        "Respond in the following JSON format:\n"
+        "{\n"
+        "  \"answer\": \"<Your answer here>\",\n"
+        "  \"is_relevant\": \"yes\" or \"no\",\n"
+        "  \"decision\": \"search_links\" or \"more_info\"\n"
+        "}\n"
+    )
     
-    # Ask LLM about the content
-    prompt: str = f"Here is the content: {content}\n\nAnswer this question: {question}, don't use your information, stick to the content"
     response = model.generate_content(prompt)
     
     if response.candidates and len(response.candidates) > 0:
         candidate = response.candidates[0]
-        return candidate.content.parts[0].text.strip() if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts') else None
-    return None
+        result = candidate.content.parts[0].text.strip() if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts') else None
+        
 
-def analyze_answer_relevance(answer: str, question: str) -> bool:
-    """
-    This function sends the answer and the question to the LLM to check if the answer is relevant.
-    The LLM will analyze whether the answer directly addresses the question's topic.
-    """
-    try:
-        prompt: str = (
-            f"Question: {question}\n\n"
-            f"Answer: {answer}\n\n"
-            "Does the answer directly address the question? "
-        )
-        response = model.generate_content(prompt)
-        if response.candidates and len(response.candidates) > 0:
-            relevance_check: str = response.candidates[0].content.parts[0].text.strip().lower()
-            return 'yes' in relevance_check
-        return False
-    except Exception as e:
-        console.print(f"[bold red]Error in LLM response during relevance check:[/bold red] {e}")
-        return False
+        
+        # Clean up the result to remove backticks or any unwanted prefix like 'json'
+        if result.startswith("```") and result.endswith("```"):
+            result = result[3:-3].strip()  # Remove the backticks
+        if result.startswith("json"):
+            result = result[4:].strip()  # Remove the 'json' prefix
 
-def llm_based_on_decision(question: str, answer: str) -> Optional[str]:
-    """
-    This function lets the LLM decide if it needs more information from the user or should search for other links.
-    Returns 'more_info' if the LLM needs more details or 'search_links' if it decides to search for other links.
-    """
-    try:
-        prompt: str = (
-            f"Question: {question}\n\n"
-            f"Answer: {answer}\n\n"
-            "Evaluate how closely the question is related to the content in the answer:\n"
-            "- If the question is loosely related to the content (e.g., both belong to similar categories or fields, like programming languages or technologies), respond with 'search_links'.\n"
-            "- If the question is completely unrelated to the content (e.g., a question about a political figure and content about programming), respond with 'more_info'."
-        )
-        response = model.generate_content(prompt)
-        if response.candidates and len(response.candidates) > 0:
-            decision: str = response.candidates[0].content.parts[0].text.strip().lower()
-            return decision
-        return "search_links"
-    except Exception as e:
-        console.print(f"[bold red]Error in LLM decision:[/bold red] {e}")
-        return "search_links"
+        
+        # Try to parse the result as JSON
+        try:
+            return json.loads(result)  # Parse the cleaned result
+        except json.JSONDecodeError:
+            console.print(f"[bold red]Error: LLM did not return valid JSON. Output was: {result}[/bold red]")
+            # Return a default fallback structure if JSON parsing fails
+            return {
+                "answer": result,  # Return the raw result as the answer if it's not in JSON format
+                "is_relevant": "no",
+                "decision": "search_links"
+            }
+    else:
+        # Handle case when no candidate or empty response
+        console.print(f"[bold red]Error: No candidates returned from the LLM.[/bold red]")
+        return {
+            "answer": None,
+            "is_relevant": "no",
+            "decision": "search_links"
+        }
 
 # Updated search_for_answer function
 async def search_for_answer(websocket: WebSocket, url: str, question: str, user_choice: str, max_attempts: int = 3) -> Tuple[Optional[str], Optional[str]]:
@@ -115,21 +116,28 @@ async def search_for_answer(websocket: WebSocket, url: str, question: str, user_
     """
     console.print(Panel(f"Searching the provided URL: {url}", style="bold cyan"))
     
-    # Find answer based on the initial URL
-    answer: Optional[str] = find_answer_in_url(url, question, user_choice)
-    
-    # Check if the answer is relevant
-    if answer and analyze_answer_relevance(answer, question):
-        console.print(Panel(f"✅ Relevant answer found in the provided URL:\n{answer}", style="bold green"))
+    # Extract content from the URL
+    content: Optional[str] = find_content_from_url(url)
+    if not content:
+        console.print(f"[bold red]No content found in the provided URL: {url}[/bold red]")
+        return None, None
+    # Call LLM once and get all required information
+    llm_result = call_llm_with_json(content, question)
+    console.print(f"[bold red]LLM_RESULT ======={llm_result}[/bold red] ")
+
+    answer = llm_result.get("answer", None)
+    is_relevant = llm_result.get("is_relevant","yes")
+    decision = llm_result.get("decision", "search_links")
+
+    if answer and is_relevant == "yes":
+        console.print(Panel(f"✅ Relevant answer found:\n{answer}", style="bold green"))
         return answer, url
     else:
-        console.print(Panel("❌ No relevant answer found in the provided URL.", style="bold red"))
-    
-    # Let the LLM decide whether more information is needed
-    decision = llm_based_on_decision(question, answer)
-    
+        console.print(Panel(f"❌ No relevant answer found.", style="bold red"))
+
+    # If more information is needed
     if "more_info" in decision:
-        # Send a message to the WebSocket client asking for more information (new URL and question)
+        console.print("HERE")
         await manager.send_personal_message(json.dumps({
             "message": "The LLM needs more information. Please provide a new URL and question."
         }), websocket)
@@ -157,11 +165,12 @@ async def search_for_answer(websocket: WebSocket, url: str, question: str, user_
     attempts: int = 0
     for link in additional_links:
         console.print(f"🔍 Searching in URL: [bold blue]{link}[/bold blue]")
-        answer = find_answer_in_url(link, question, user_choice)
-        
-        if answer and analyze_answer_relevance(answer, question):
-            console.print(Panel(f"✅ Relevant answer found in additional link:\n{answer}", style="bold green"))
-            return answer, link
+        answer = find_content_from_url(link)
+        if answer:
+            # Reuse the LLM with the extracted content from the new link
+            llm_result = call_llm_with_json(answer, question)
+            if llm_result.get("is_relevant", "no") == "yes":
+                return llm_result.get("answer"), link
         
         attempts += 1
         if attempts >= max_attempts:
@@ -185,8 +194,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
             console.print(f"Received URL: {url}, Question: {question}")  # Log URL and question
 
-            # Step 2: Extract content from the URL
-            answer, link = await search_for_answer(websocket, url, question, "detailed")  # Await the updated function
+            # Step 2: Extract content from the URL and use the updated function
+            answer, link = await search_for_answer(websocket, url, question, "detailed")
             
             if answer is None:
                 answer = "No relevant information is found"
