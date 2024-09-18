@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebSocket Client</title>
     <style>
+        /* Style for table */
         table {
             width: 100%;
             border-collapse: collapse;
@@ -18,6 +19,47 @@
         }
         th {
             background-color: #f2f2f2;
+        }
+
+        /* Modal styling */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            width: 400px;
+            text-align: center;
+        }
+
+        .modal input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            box-sizing: border-box;
+        }
+
+        .modal button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        .modal button:hover {
+            background-color: #45a049;
         }
     </style>
 </head>
@@ -48,88 +90,171 @@
         </tbody>
     </table>
 
+    <!-- Modal for new URL and Question input -->
+    <div id="inputModal" class="modal">
+        <div class="modal-content">
+            <h2>Provide New URL and Question</h2>
+            <input id="newUrlInput" type="text" placeholder="Enter new URL" />
+            <input id="newQuestionInput" type="text" placeholder="Enter new question" />
+            <button onclick="submitNewData()">Submit</button>
+        </div>
+    </div>
+
     <script>
-        // Establish WebSocket connection with the server
-        const ws = new WebSocket("ws://127.0.0.1:8004/ws");
+        // Function to create a WebSocket connection
+        function createWebSocketConnection(url) {
+            const ws = new WebSocket(url);
 
-        // Handle successful WebSocket connection
-        ws.onopen = function() {
-            console.log("WebSocket connection established!");
-        };
+            ws.onopen = function() {
+                console.log("WebSocket connection established!");
+            };
 
-        // Handle incoming messages from the WebSocket server
-        ws.onmessage = function(event) {
-            const data = JSON.parse(event.data);  // Assuming the server sends a JSON object
-            const tableBody = document.querySelector('#messagesTable tbody');
+            ws.onmessage = function(event) {
+                handleWebSocketMessage(event);
+            };
 
-            // Check if the server is requesting more information
+            ws.onerror = function(error) {
+                console.error("WebSocket Error: ", error);
+            };
+
+            ws.onclose = function() {
+                console.log("WebSocket connection closed");
+            };
+
+            return ws;  // Return the WebSocket instance
+        }
+
+        // Initialize WebSocket connection
+        const ws = createWebSocketConnection("ws://127.0.0.1:8004/ws");
+
+        // Function to handle incoming messages from the WebSocket server
+        function handleWebSocketMessage(event) {
+            const data = JSON.parse(event.data);
+
+            // Check if the LLM requests more information
             if (data.message && data.message.includes("The LLM needs more information")) {
-                // Show a prompt for the user to input new URL and question
-                const newUrl = prompt("The LLM needs more information. Please provide a new URL:");
-                const newQuestion = prompt("Please provide a new question:");
-
-                // Send the new input back to the server
-                if (newUrl && newQuestion) {
-                    const newMessage = JSON.stringify({
-                        url: newUrl,
-                        question: newQuestion
-                    });
-                    ws.send(newMessage);
-                }
+                // Show the modal for user to input new URL and question
+                openModal();
             } else {
+                updateRowWithResponse(data);
+            }
+        }
+
+        // Open the modal
+        function openModal() {
+            document.getElementById("inputModal").style.display = "flex";
+        }
+
+        // Close the modal
+        function closeModal() {
+            document.getElementById("inputModal").style.display = "none";
+        }
+
+        // Function to submit new URL and question from the modal
+        function submitNewData() {
+            const newUrl = document.getElementById("newUrlInput").value.trim();
+            const newQuestion = document.getElementById("newQuestionInput").value.trim();
+
+            if (newUrl && newQuestion) {
+                const newMessage = JSON.stringify({
+                    url: newUrl,
+                    question: newQuestion
+                });
+
+                // Send the new message to the WebSocket server
+                ws.send(newMessage);
+
+                // Update the existing row with the new URL and question instead of adding a new row
+                const existingRow = findRowByQuestion(newQuestion);
+
+                if (existingRow) {
+                    existingRow.cells[0].textContent = newQuestion;
+                    existingRow.cells[1].textContent = "Pending...";  // Update answer to pending
+                    existingRow.cells[2].querySelector('a').href = newUrl;
+                    existingRow.cells[2].querySelector('a').textContent = newUrl;
+                } else {
+                    // If no existing row is found, create a new row
+                    updateTableWithNewInput(newQuestion, newUrl, "Pending...");
+                }
+
+                // Clear modal input fields
+                document.getElementById("newUrlInput").value = '';
+                document.getElementById("newQuestionInput").value = '';
+
+                // Close the modal
+                closeModal();
+            }
+        }
+
+        // Function to update the existing row with the final response
+        function updateRowWithResponse(data) {
+            const existingRow = findRowByQuestion(data.question);
+
+            if (existingRow) {
+                existingRow.cells[1].textContent = data.answer;
+                existingRow.cells[2].querySelector('a').href = data.link;
+                existingRow.cells[2].querySelector('a').textContent = data.link;
+            }
+        }
+
+        // Function to find a table row by the question
+        function findRowByQuestion(question) {
+            const rows = document.querySelectorAll('#messagesTable tbody tr');
+            
+            for (let row of rows) {
+                if (row.cells[0].textContent === question) {
+                    return row;
+                }
+            }
+            return null;  // Return null if no row with the question is found
+        }
+
+        // Function to update the table with new input (before response)
+        function updateTableWithNewInput(question, url, answer) {
+            const existingRow = findRowByQuestion(question);
+            
+            if (existingRow) {
+                existingRow.cells[1].textContent = answer;
+                existingRow.cells[2].querySelector('a').href = url;
+                existingRow.cells[2].querySelector('a').textContent = url;
+            } else {
+                const tableBody = document.querySelector('#messagesTable tbody');
                 const row = document.createElement('tr');
-                
-                // Create table data for question
+
                 const questionCell = document.createElement('td');
-                questionCell.textContent = data.question;
+                questionCell.textContent = question;
                 row.appendChild(questionCell);
 
-                // Create table data for answer
                 const answerCell = document.createElement('td');
-                answerCell.textContent = data.answer;
+                answerCell.textContent = answer;
                 row.appendChild(answerCell);
 
-                // Create table data for link
                 const linkCell = document.createElement('td');
                 const linkAnchor = document.createElement('a');
-                linkAnchor.href = data.link;
-                linkAnchor.textContent = data.link;
-                linkAnchor.target = "_blank";  // Opens the link in a new tab
+                linkAnchor.href = url;
+                linkAnchor.textContent = url;
+                linkAnchor.target = "_blank";
                 linkCell.appendChild(linkAnchor);
                 row.appendChild(linkCell);
 
-                // Append the row to the table body
                 tableBody.appendChild(row);
             }
-        };
+        }
 
-        // Handle WebSocket errors
-        ws.onerror = function(error) {
-            console.error("WebSocket Error: ", error);
-        };
-
-        // Handle WebSocket closing
-        ws.onclose = function() {
-            console.log("WebSocket connection closed");
-        };
-
-        // Function to send the URL and question to the WebSocket server
+        // Function to send the initial URL and question to the WebSocket server
         function sendRequest() {
             const urlInput = document.getElementById("urlInput");
             const questionInput = document.getElementById("questionInput");
 
-            // Ensure both fields are filled before sending the data
             if (urlInput.value.trim() !== "" && questionInput.value.trim() !== "") {
-                // Combine the URL and question into one message (in JSON format)
                 const message = JSON.stringify({
-                    url: urlInput.value,
-                    question: questionInput.value
+                    url: urlInput.value.trim(),
+                    question: questionInput.value.trim()
                 });
 
-                // Send the combined message to the WebSocket server
                 ws.send(message);
+                updateTableWithNewInput(questionInput.value.trim(), urlInput.value.trim(), "Pending...");
 
-                // Clear input fields
                 urlInput.value = '';
                 questionInput.value = '';
             } else {
