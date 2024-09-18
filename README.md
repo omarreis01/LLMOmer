@@ -4,7 +4,7 @@ The last code is the SON/main.py,
 
 Broke but better code is Websocket/main.py,
 
-in terminal can be runned by uvicorn main:app --reload --host 0.0.0.0 --port 8004 and open the html file
+in terminal can be runned by docker run -p 8004:8004 --env-file MyLLM.env myfastapiapp and open the html file
 
 and env file contains this:
 
