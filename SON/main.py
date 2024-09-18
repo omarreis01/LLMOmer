@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 import os
 
 # Load environment variables
-load_dotenv(dotenv_path="MyLLM.env")
+load_dotenv(dotenv_path="main.env")
 
 
 # Claude LLM Class
