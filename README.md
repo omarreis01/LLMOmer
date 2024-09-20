@@ -2,7 +2,7 @@
 
 The last code is the SON/main.py,
 
-with many file and added pydantic in ManyFile/main.py
+with many file in ManyFiles/main.py(also added pydantic but tba)
 
 in terminal can be runned by docker run -p 8004:8004 --env-file main.env myfastapiapp and open the html file
 
